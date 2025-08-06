@@ -1,49 +1,94 @@
 from flask import Flask, request, jsonify
+from datetime import datetime
+import logging
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
 
-@app.route('/ivr', methods=['GET'])
-def handle_ivr():
-    # שליפת הפרמטרים מה-URL
-    phone = request.args.get('PBXphone')
-    pbx_num = request.args.get('PBXnum')
-    pbx_did = request.args.get('PBXdid')
-    call_id = request.args.get('PBXcallId')
-    call_type = request.args.get('PBXcallType')
-    call_status = request.args.get('PBXcallStatus')
-    extension_id = request.args.get('PBXextensionId')
-    extension_path = request.args.get('PBXextensionPath')
-    client_data = request.args.get('dataGet')
-    print(client_data)
-    # כאן צריך להיות קוד שבודק בדאטהבייס האם המספר מופיע, ולדרוש סיסמה
+@app.route("/ivr", methods=["GET", "POST"])
+def ivr_entry():
+    data = request.args.to_dict()
+    logging.info(f"🔔 קריאה התקבלה: {data}")
 
-    # במידה ויש סיסמה, יתבצע כאן אימות
-    
-    # כאן יהיה קוד שיפנה את המאזין לפונקציה המתאימה לפי הקשתו, או לחיבור אם איננו מנוי
-    
+    phone = data.get("PBXphone")
+    extension = data.get("PBXextensionId")
+    main_menu_choice = data.get("mainMenu")  # האם מדובר בהקשה מהתפריט?
 
-    # הדפסתם ללוג (לבדיקה)
-    print(f"שיחה מזוהה: {phone} | סטטוס: {call_status} | שלוחה: {extension_path}")
+    # שלב 1: בדיקה אם למאזין יש מנוי
+    if not is_active_user(phone):
+        return jsonify({
+            "type": "extensionChange",
+            "extensionIdChange": "200"  # שלוחת הצטרפות
+        })
 
-    # החזרת כל הפרטים כ־JSON
-    return jsonify({
-        "type": "getDTMF",
-        "name": "dataGet",
-        "max": 10,
-        "min": 9,
+    # שלב 2: אם אין הקשה, שלח תפריט
+    if not main_menu_choice:
+        return jsonify(get_main_menu())
+
+    # שלב 3: ניתוב לפי ההקשה שבוצעה
+    return jsonify(route_main_menu_choice(main_menu_choice))
+
+
+# תפריט ראשי למנויים
+def get_main_menu():
+    return {
+        "type": "simpleMenu",
+        "name": "mainMenu",  # ישלח חזרה עם ההקשה
+        "times": 3,
         "timeout": 5,
-        "skipKey": "#",
-        "skipValue": "NO_VALUE",
-        "confirmType": "digits",
-        "setMusic": "yes",
+        "enabledKeys": "1,2,3,4,5,6,7,8",
         "files": [
             {
-                "text": "מערכת עסק-קל לניהול עסק דרך הטלפון"
+                "text": "נא בחר שלוחה"
             }
         ]
     }
-)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
 
+# פונקציה שמחזירה JSON לפי ההקשה מהמאזין
+def route_main_menu_choice(choice):
+    if choice == "1":
+        return {
+            "type": "extensionChange",
+            "extensionIdChange": "101"  # שלוחת הנפקת קבלה
+        }
+    elif choice == "2":
+        return {
+            "type": "extensionChange",
+            "extensionIdChange": "102"  # שלוחת ביטול קבלה
+        }
+    elif choice == "3":
+        return {
+            "type": "extensionChange",
+            "extensionIdChange": "103"  # עדכון פרטים
+        }
+    elif choice == "4":
+        return {
+            "type": "extensionChange",
+            "extensionIdChange": "104"  # שמיעת זכויות
+        }
+    elif choice == "5":
+        return {
+            "type": "extensionChange",
+            "extensionIdChange": "105"  # השארת הודעה
+        }
+    elif choice == "6":
+        return {
+            "type": "extensionChange",
+            "extensionIdChange": "106"  # בקשת דיווח שנתי
+        }
+    else:
+        return {
+            "type": "extensionChange",
+            "extensionIdChange": ".."  # חזרה אחורה אם הקשה לא חוקית
+        }
+
+
+# הדמיה של בדיקת מנוי פעיל
+def is_active_user(phone):
+    active_numbers = ["0501234567", "0507654321"]
+    return phone in active_numbers
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
