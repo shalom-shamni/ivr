@@ -13,7 +13,8 @@ def handle_ivr():
     call_status = request.args.get('PBXcallStatus')
     extension_id = request.args.get('PBXextensionId')
     extension_path = request.args.get('PBXextensionPath')
-
+    client_data = request.args.get('dataGet')
+    print(client_data)
     # כאן צריך להיות קוד שבודק בדאטהבייס האם המספר מופיע, ולדרוש סיסמה
 
     # במידה ויש סיסמה, יתבצע כאן אימות
